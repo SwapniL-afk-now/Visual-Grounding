@@ -138,6 +138,7 @@ def run_inference(model, processor, image_path, query):
 import supervision as sv
 
 def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, teacher_box=None):
+    print(f"DEBUG: visualize_result called with teacher_box={'set' if teacher_box is not None else 'None'}")
     print(f"\nModel Output:\n{output_text}")
     
     # 1. Extraction (Coordinates and Query)
