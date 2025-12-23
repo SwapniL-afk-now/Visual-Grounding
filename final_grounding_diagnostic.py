@@ -202,7 +202,18 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
     plt.tight_layout()
     plt.savefig("grounding_diagnostic.png", dpi=150)
     print("Result saved to grounding_diagnostic.png")
-    plt.show() # Display the image in interactive environments
+    
+    # Force display in interactive environments
+    try:
+        from IPython import get_ipython
+        if get_ipython() is not None:
+            from IPython.display import display, Image as IPImage
+            display(plt.gcf())
+    except ImportError:
+        pass
+    
+    plt.show(block=False)
+    plt.pause(0.1) 
 
 if __name__ == "__main__":
     import argparse
