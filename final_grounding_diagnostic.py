@@ -203,7 +203,7 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
         ax.set_title(title, fontsize=14)
         ax.axis("off")
 
-    # Panel 4: Teacher Oracle (DINO + SAM)
+    # Panel 4: Teacher Oracle (Grounding DINO)
     ax_teacher = axes[3]
     if teacher_box is not None:
         import supervision as sv
@@ -213,15 +213,13 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
         
         t_frame = np.array(image)
         t_frame = t_annotator.annotate(scene=t_frame, detections=t_detections)
-        t_frame = t_label_annotator.annotate(scene=t_frame, detections=t_detections, labels=["TEACHER TRUTH"])
+        t_frame = t_label_annotator.annotate(scene=t_frame, detections=t_detections, labels=["DINO TRUTH"])
         
         ax_teacher.imshow(t_frame)
-        if teacher_mask is not None:
-            ax_teacher.imshow(teacher_mask, alpha=0.3, cmap='Reds')
     else:
         ax_teacher.imshow(image)
-        ax_teacher.text(0.5, 0.5, "Teacher Failed", color='red', ha='center', va='center', fontsize=20)
-    ax_teacher.set_title(f"Teacher Oracle (DINO/SAM)", fontsize=14)
+        ax_teacher.text(0.5, 0.5, "DINO Failed", color='red', ha='center', va='center', fontsize=20)
+    ax_teacher.set_title(f"Teacher Oracle (DINO)", fontsize=14)
     ax_teacher.axis("off")
 
     plt.tight_layout()
@@ -243,10 +241,10 @@ if __name__ == "__main__":
     import argparse
     from teacher_oracle import TeacherOracle
     
-    parser = argparse.ArgumentParser(description="Multi-purpose Visual Grounding Diagnostic with Teacher Oracle")
+    parser = argparse.ArgumentParser(description="Multi-purpose Visual Grounding Diagnostic with DINO Teacher")
     parser.add_argument("image", help="Path to input image")
     parser.add_argument("query", help="Text query (e.g., 'Find the box on the table')")
-    parser.add_argument("--teacher", action="store_true", help="Enable Grounding DINO + SAM Teacher Oracle")
+    parser.add_argument("--teacher", action="store_true", help="Enable Grounding DINO Teacher Oracle")
     args = parser.parse_args()
 
     if not os.path.exists(args.image):
@@ -257,13 +255,13 @@ if __name__ == "__main__":
     out_text, img, t_hm, a_hm = run_inference(model, processor, args.image, args.query)
     
     # Extract Teacher Ground Truth if enabled
-    t_box, t_mask = None, None
+    t_box = None
     if args.teacher:
         # Extract <query> tag from VLM response
         query_tag_match = re.search(r"<query>(.*?)</query>", out_text, re.DOTALL)
         oracle_query = query_tag_match.group(1).strip() if query_tag_match else args.query
         
         oracle = TeacherOracle()
-        t_box, t_mask = oracle.get_ground_truth(img, oracle_query)
+        t_box = oracle.get_ground_truth(img, oracle_query)
         
-    visualize_result(out_text, img, t_hm, a_hm, args.query, teacher_box=t_box, teacher_mask=t_mask)
+    visualize_result(out_text, img, t_hm, a_hm, args.query, teacher_box=t_box)

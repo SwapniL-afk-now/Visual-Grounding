@@ -9,6 +9,8 @@ A high-precision visual grounding and attention visualization tool for Qwen2.5-V
 - **Attention Diagnostics**: Extract and visualize separate heatmaps for `<think>` and `<answer>` phases.
 - **Teacher Oracle Loop**: Uses Grounding DINO and SAM to provide objective BBox and Mask "truth".
 - **4-Panel Visualization**: Compare VLM Prediction, reasoning attention, and Teacher Oracle verdict side-by-side.
+- **Teacher Oracle Loop**: Uses Grounding DINO to provide objective BBox "truth".
+- **4-Panel Visualization**: Compare VLM Prediction, reasoning attention, and Grounding DINO verdict side-by-side.
 - **High-Precision Visualization**: Powered by the `supervision` library with automatic color-cycling.
 
 ## Installation
@@ -33,14 +35,14 @@ python final_grounding_diagnostic.py "image.jpg" "Find the dog"
 ```
 
 ### 2. Teacher Oracle Mode (4 Panels)
-Run with the `--teacher` flag to activate Grounding DINO + SAM for objective verification:
+Run with the `--teacher` flag to activate Grounding DINO for objective verification:
 ```bash
 python final_grounding_diagnostic.py "image.jpg" "Find the dog" --teacher
 ```
 
 ## How it Works
 1. **VLM Generation**: Qwen2.5-VL generates `<think>` (reasoning), `<query>` (target name), and `<answer>` (grounding).
-2. **Teacher Verification**: The `<query>` tag is passed to **Grounding DINO** to find the objective bounding box, which is then refined by **SAM** into a mask.
+2. **Teacher Verification**: The `<query>` tag is passed to **Grounding DINO** to find the objective bounding box.
 3. **Comparison**: All signals are visualized in a 4-panel plot to diagnose the "Grounding Gap."
 
 ## Requirements
