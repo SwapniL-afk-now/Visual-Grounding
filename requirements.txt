@@ -1,0 +1,16 @@
+# Core ML
+torch>=2.5.0
+torchvision>=0.20.0
+transformers>=4.49.0
+accelerate>=1.1.0
+qwen-vl-utils[decord]>=0.0.8
+
+# Numerical & Visualization
+numpy>=1.26.0
+matplotlib>=3.8.0
+pillow>=10.0.0
+scipy>=1.11.0
+
+# Troubleshooting
+bitsandbytes>=0.43.0
+sentencepiece
