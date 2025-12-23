@@ -7,8 +7,9 @@ A high-precision visual grounding and attention visualization tool for Qwen2.5-V
 ## Core Features
 - **Generic Grounding**: Locate any object in any image using natural language.
 - **Attention Diagnostics**: Extract and visualize separate heatmaps for `<think>` and `<answer>` phases.
-- **Multi-Object Parsing**: Robustly handles multiple bounding boxes and dense coordinate outputs.
-- **Clean XML Output**: Enforces structured reasoning via `<think>...</think><answer>...</answer>` tags.
+- **SAM3 Teacher Oracle**: Ready-to-use wrapper for high-precision segmentation masks and BBox refinement.
+- **High-Precision Visualization**: Powered by the `supervision` library with automatic color-cycling and labels.
+- **Interactive Display**: Automatic `%matplotlib` aware image display for Jupyter/Kaggle environments.
 
 ## Installation
 
@@ -26,19 +27,25 @@ A high-precision visual grounding and attention visualization tool for Qwen2.5-V
 
 ## Usage
 
+### 1. Grounding Diagnostic
 Run the diagnostic script by providing an image path and a text query:
 
 ```bash
 python final_grounding_diagnostic.py "path/to/image.jpg" "Find the white bear on the left"
 ```
 
-### Script Arguments:
-- `image`: Path to the input image.
-- `query`: The text query describing what to locate.
+### 2. SAM3 Teacher Oracle
+To use the SAM3 teacher for mask generation or reward calculation:
+
+```python
+from sam3_teacher import SAM3Teacher
+
+teacher = SAM3Teacher()
+mask, precise_box = teacher.get_ground_truth("image.jpg", query_box=[xmin, ymin, xmax, ymax])
+```
 
 ## How it Works
-
-The script leverages **Grad-CAM attention aggregation** across all layers of the Qwen2.5-VL model. It maps the visual attention tokens specifically associated with the reasoning process (`<think>`) and the final numeric output (`<answer>`), allowing researchers to see if the model is "looking" at the right spot even if its numeric coordinates are slightly off.
+The script leverages **Grad-CAM attention aggregation** across all layers of the Qwen2.5-VL model. It maps the visual attention tokens specifically associated with the reasoning process (`<think>`) and the final numeric output (`<answer>`).
 
 ## Requirements
 - Python 3.10+
