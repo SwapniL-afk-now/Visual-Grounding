@@ -209,8 +209,12 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, t
     if teacher_box is not None:
         import supervision as sv
         t_detections = sv.Detections(xyxy=np.array([teacher_box]))
-        t_annotator = sv.BoxAnnotator(color=sv.Color.RED)
-        t_label_annotator = sv.LabelAnnotator(color=sv.Color.RED)
+        # Use INDEX lookup to avoid class_id requirement, and specify a single color
+        t_annotator = sv.BoxAnnotator(color_lookup=sv.ColorLookup.INDEX)
+        # Note: older supervision used 'color', newer uses 'color_lookup'. 
+        # To force a specific color, we can pass it to annotate or use a palette.
+        # But for simplicity and compatibility with the error message:
+        t_label_annotator = sv.LabelAnnotator(color_lookup=sv.ColorLookup.INDEX)
         
         t_frame = np.array(image)
         t_frame = t_annotator.annotate(scene=t_frame, detections=t_detections)
