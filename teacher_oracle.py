@@ -2,7 +2,6 @@ import torch
 from PIL import Image
 import numpy as np
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
-from ultralytics import SAM
 
 class TeacherOracle:
     """
