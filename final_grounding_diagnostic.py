@@ -200,20 +200,19 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
         ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig("grounding_diagnostic.png", dpi=150)
-    print("Result saved to grounding_diagnostic.png")
+    save_path = "grounding_diagnostic.png"
+    plt.savefig(save_path, dpi=150)
+    plt.close() # Close to free memory and prevent double display
+    print(f"Result saved to {save_path}")
     
-    # Force display in interactive environments
+    # Force display in interactive environments (Kaggle/Jupyter)
     try:
         from IPython import get_ipython
         if get_ipython() is not None:
             from IPython.display import display, Image as IPImage
-            display(plt.gcf())
+            display(IPImage(filename=save_path))
     except ImportError:
         pass
-    
-    plt.show(block=False)
-    plt.pause(0.1) 
 
 if __name__ == "__main__":
     import argparse
