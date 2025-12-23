@@ -134,38 +134,69 @@ def run_inference(model, processor, image_path, query):
     
     return output_text, image, think_hm, answer_hm
 
+import supervision as sv
+
 def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
     print(f"\nModel Output:\n{output_text}")
+    
+    # 1. Coordinate Extraction
     answer_section = re.search(r"<answer>(.*?)</answer>", output_text, re.DOTALL)
     search_text = answer_section.group(1) if answer_section else output_text
     nums = re.findall(r"(\d+)", search_text)
-    coord_blocks = [[float(n) for n in nums[i:i+4]] for i in range(0, len(nums) - len(nums) % 4, 4)]
+    
+    # Group into [xmin, ymin, xmax, ymax] boxes
+    raw_boxes = [[float(n) for n in nums[i:i+4]] for i in range(0, len(nums) - len(nums) % 4, 4)]
+    
+    # Scale to Pixels
+    w, h = image.size
+    pixel_boxes = []
+    labels = []
+    for i, box in enumerate(raw_boxes):
+        xmin, ymin, xmax, ymax = box
+        px_box = [
+            xmin * w / 1000, 
+            ymin * h / 1000, 
+            xmax * w / 1000, 
+            ymax * h / 1000
+        ]
+        pixel_boxes.append(px_box)
+        labels.append(f"OBJ {i+1}")
 
+    # 2. Professional Annotation using 'supervision'
+    image_np = np.array(image)
+    if pixel_boxes:
+        detections = sv.Detections(xyxy=np.array(pixel_boxes))
+        box_annotator = sv.BoxAnnotator(color_lookup=sv.ColorLookup.INDEX)
+        label_annotator = sv.LabelAnnotator(
+            color_lookup=sv.ColorLookup.INDEX,
+            text_padding=6,
+            text_scale=0.8
+        )
+        annotated_frame = box_annotator.annotate(scene=image_np.copy(), detections=detections)
+        annotated_frame = label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
+    else:
+        annotated_frame = image_np
+
+    # 3. Visualization Layout
     fig, axes = plt.subplots(1, 3, figsize=(24, 8))
-    axes[0].imshow(image)
-    if coord_blocks:
-        colors = ['lime', 'cyan', 'magenta', 'yellow', 'orange', 'red']
-        for i, coords in enumerate(coord_blocks):
-            xmin, ymin, xmax, ymax = coords
-            w, h = image.size
-            l, t = xmin * w / 1000, ymin * h / 1000
-            r, b = xmax * w / 1000, ymax * h / 1000
-            rect = patches.Rectangle((l, t), r-l, b-t, linewidth=3, edgecolor=colors[i % len(colors)], facecolor='none')
-            axes[0].add_patch(rect)
-    axes[0].set_title(f"Result for: '{query}'")
+    
+    # Panel 1: Supervision BBoxes
+    axes[0].imshow(annotated_frame)
+    axes[0].set_title(f"Precision Boxes: '{query}'", fontsize=14)
     axes[0].axis("off")
 
+    # Panel 2 & 3: Attention Maps (Same logic, cleaner calls)
     for idx, (hm, title, cmap) in enumerate([(think_heatmap, "Panel 2: <think> Attention", "jet"), 
                                             (answer_heatmap, "Panel 3: <answer> Attention", "hot")]):
         ax = axes[idx+1]
         if hm is not None:
-            zh, zw = image.size[1] / hm.shape[0], image.size[0] / hm.shape[1]
+            zh, zw = h / hm.shape[0], w / hm.shape[1]
             h_res = zoom(hm, (zh, zw), order=1)
             ax.imshow(image)
             ax.imshow(h_res, cmap=cmap, alpha=0.5)
         else:
             ax.text(0.5, 0.5, "Heatmap Unavailable", ha='center', va='center')
-        ax.set_title(title)
+        ax.set_title(title, fontsize=14)
         ax.axis("off")
 
     plt.tight_layout()

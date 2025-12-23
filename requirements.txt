@@ -10,6 +10,7 @@ numpy>=1.26.0
 matplotlib>=3.8.0
 pillow>=10.0.0
 scipy>=1.11.0
+supervision>=0.21.0
 
 # Troubleshooting
 bitsandbytes>=0.43.0
