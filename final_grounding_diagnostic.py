@@ -16,16 +16,17 @@ from scipy.ndimage import zoom
 MODEL_ID = "Qwen/Qwen2.5-VL-3B-Instruct"
 IMAGE_PATH = "animals.jpg"  # Default fallback
 
-SYSTEM_PROMPT = """You are a visual grounding expert. You MUST follow this output format EXACTLY:
-
-<think>
-[Step-by-step reasoning: I see a ..., the ... is at ..., etc.]
-</think>
-<answer>
-[xmin, ymin, xmax, ymax]
-</answer>
-
-Do NOT output coordinates outside of the <answer> tags. Keep the reasoning inside <think> tags."""
+SYSTEM_PROMPT = (
+    "You are a high-precision visual grounding expert. "
+    "Follow this exact sequence for every response:\n"
+    "1. <think>: Reasoning about object locations and spatial relationships.\n"
+    "2. <query>: A simplified, concise name of the object(s) found (for external grounding tools).\n"
+    "3. <answer>: Coordinates in [xmin, ymin, xmax, ymax] format (0-1000 scale).\n\n"
+    "Example:\n"
+    "<think>The red cup is on the wooden table next to the laptop.</think>\n"
+    "<query>red cup</query>\n"
+    "<answer>[120, 450, 300, 680]</answer>"
+)
 
 def load_model():
     print(f"Loading {MODEL_ID} (Dual GPU, Eager Attention)...")
@@ -139,10 +140,13 @@ import supervision as sv
 def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
     print(f"\nModel Output:\n{output_text}")
     
-    # 1. Coordinate Extraction
+    # 1. Extraction (Coordinates and Query)
     answer_section = re.search(r"<answer>(.*?)</answer>", output_text, re.DOTALL)
     search_text = answer_section.group(1) if answer_section else output_text
     nums = re.findall(r"(\d+)", search_text)
+    
+    query_tag_match = re.search(r"<query>(.*?)</query>", output_text, re.DOTALL)
+    extracted_query = query_tag_match.group(1).strip() if query_tag_match else query
     
     # Group into [xmin, ymin, xmax, ymax] boxes
     raw_boxes = [[float(n) for n in nums[i:i+4]] for i in range(0, len(nums) - len(nums) % 4, 4)]
@@ -178,14 +182,14 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
         annotated_frame = image_np
 
     # 3. Visualization Layout
-    fig, axes = plt.subplots(1, 3, figsize=(24, 8))
+    fig, axes = plt.subplots(1, 4, figsize=(32, 8))
     
-    # Panel 1: Supervision BBoxes
+    # Panel 1: VLM Precision Boxes
     axes[0].imshow(annotated_frame)
-    axes[0].set_title(f"Precision Boxes: '{query}'", fontsize=14)
+    axes[0].set_title(f"VLM Prediction: '{extracted_query}'", fontsize=14)
     axes[0].axis("off")
 
-    # Panel 2 & 3: Attention Maps (Same logic, cleaner calls)
+    # Panel 2 & 3: Attention Maps
     for idx, (hm, title, cmap) in enumerate([(think_heatmap, "Panel 2: <think> Attention", "jet"), 
                                             (answer_heatmap, "Panel 3: <answer> Attention", "hot")]):
         ax = axes[idx+1]
@@ -199,13 +203,34 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
         ax.set_title(title, fontsize=14)
         ax.axis("off")
 
+    # Panel 4: Teacher Oracle (DINO + SAM)
+    ax_teacher = axes[3]
+    if teacher_box is not None:
+        import supervision as sv
+        t_detections = sv.Detections(xyxy=np.array([teacher_box]))
+        t_annotator = sv.BoxAnnotator(color=sv.Color.RED)
+        t_label_annotator = sv.LabelAnnotator(color=sv.Color.RED)
+        
+        t_frame = np.array(image)
+        t_frame = t_annotator.annotate(scene=t_frame, detections=t_detections)
+        t_frame = t_label_annotator.annotate(scene=t_frame, detections=t_detections, labels=["TEACHER TRUTH"])
+        
+        ax_teacher.imshow(t_frame)
+        if teacher_mask is not None:
+            ax_teacher.imshow(teacher_mask, alpha=0.3, cmap='Reds')
+    else:
+        ax_teacher.imshow(image)
+        ax_teacher.text(0.5, 0.5, "Teacher Failed", color='red', ha='center', va='center', fontsize=20)
+    ax_teacher.set_title(f"Teacher Oracle (DINO/SAM)", fontsize=14)
+    ax_teacher.axis("off")
+
     plt.tight_layout()
     save_path = "grounding_diagnostic.png"
     plt.savefig(save_path, dpi=150)
-    plt.close() # Close to free memory and prevent double display
+    plt.close()
     print(f"Result saved to {save_path}")
     
-    # Force display in interactive environments (Kaggle/Jupyter)
+    # Force display in interactive environments
     try:
         from IPython import get_ipython
         if get_ipython() is not None:
@@ -216,9 +241,12 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Multi-purpose Visual Grounding Diagnostic")
+    from teacher_oracle import TeacherOracle
+    
+    parser = argparse.ArgumentParser(description="Multi-purpose Visual Grounding Diagnostic with Teacher Oracle")
     parser.add_argument("image", help="Path to input image")
     parser.add_argument("query", help="Text query (e.g., 'Find the box on the table')")
+    parser.add_argument("--teacher", action="store_true", help="Enable Grounding DINO + SAM Teacher Oracle")
     args = parser.parse_args()
 
     if not os.path.exists(args.image):
@@ -227,4 +255,15 @@ if __name__ == "__main__":
     
     model, processor = load_model()
     out_text, img, t_hm, a_hm = run_inference(model, processor, args.image, args.query)
-    visualize_result(out_text, img, t_hm, a_hm, args.query)
+    
+    # Extract Teacher Ground Truth if enabled
+    t_box, t_mask = None, None
+    if args.teacher:
+        # Extract <query> tag from VLM response
+        query_tag_match = re.search(r"<query>(.*?)</query>", out_text, re.DOTALL)
+        oracle_query = query_tag_match.group(1).strip() if query_tag_match else args.query
+        
+        oracle = TeacherOracle()
+        t_box, t_mask = oracle.get_ground_truth(img, oracle_query)
+        
+    visualize_result(out_text, img, t_hm, a_hm, args.query, teacher_box=t_box, teacher_mask=t_mask)

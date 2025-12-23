@@ -7,9 +7,9 @@ A high-precision visual grounding and attention visualization tool for Qwen2.5-V
 ## Core Features
 - **Generic Grounding**: Locate any object in any image using natural language.
 - **Attention Diagnostics**: Extract and visualize separate heatmaps for `<think>` and `<answer>` phases.
-- **SAM3 Teacher Oracle**: Ready-to-use wrapper for high-precision segmentation masks and BBox refinement.
-- **High-Precision Visualization**: Powered by the `supervision` library with automatic color-cycling and labels.
-- **Interactive Display**: Automatic `%matplotlib` aware image display for Jupyter/Kaggle environments.
+- **Teacher Oracle Loop**: Uses Grounding DINO and SAM to provide objective BBox and Mask "truth".
+- **4-Panel Visualization**: Compare VLM Prediction, reasoning attention, and Teacher Oracle verdict side-by-side.
+- **High-Precision Visualization**: Powered by the `supervision` library with automatic color-cycling.
 
 ## Installation
 
@@ -20,32 +20,28 @@ A high-precision visual grounding and attention visualization tool for Qwen2.5-V
    ```
 
 2. **Install Dependencies**:
-   It is recommended to use a virtual environment or `uv` for faster installation:
    ```bash
    pip install -r requirements.txt
    ```
 
 ## Usage
 
-### 1. Grounding Diagnostic
-Run the diagnostic script by providing an image path and a text query:
-
+### 1. Grounding Diagnostic (3 Panels)
+Run the standard diagnostic to see VLM internal attention:
 ```bash
-python final_grounding_diagnostic.py "path/to/image.jpg" "Find the white bear on the left"
+python final_grounding_diagnostic.py "image.jpg" "Find the dog"
 ```
 
-### 2. SAM3 Teacher Oracle
-To use the SAM3 teacher for mask generation or reward calculation:
-
-```python
-from sam3_teacher import SAM3Teacher
-
-teacher = SAM3Teacher()
-mask, precise_box = teacher.get_ground_truth("image.jpg", query_box=[xmin, ymin, xmax, ymax])
+### 2. Teacher Oracle Mode (4 Panels)
+Run with the `--teacher` flag to activate Grounding DINO + SAM for objective verification:
+```bash
+python final_grounding_diagnostic.py "image.jpg" "Find the dog" --teacher
 ```
 
 ## How it Works
-The script leverages **Grad-CAM attention aggregation** across all layers of the Qwen2.5-VL model. It maps the visual attention tokens specifically associated with the reasoning process (`<think>`) and the final numeric output (`<answer>`).
+1. **VLM Generation**: Qwen2.5-VL generates `<think>` (reasoning), `<query>` (target name), and `<answer>` (grounding).
+2. **Teacher Verification**: The `<query>` tag is passed to **Grounding DINO** to find the objective bounding box, which is then refined by **SAM** into a mask.
+3. **Comparison**: All signals are visualized in a 4-panel plot to diagnose the "Grounding Gap."
 
 ## Requirements
 - Python 3.10+
