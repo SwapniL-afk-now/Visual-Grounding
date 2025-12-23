@@ -14,8 +14,8 @@ A high-precision visual grounding and attention visualization tool for Qwen2.5-V
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/visual-grounding-diagnostic.git
-   cd visual-grounding-diagnostic
+   git clone https://github.com/SwapniL-afk-now/Visual-Grounding.git
+   cd Visual-Grounding
    ```
 
 2. **Install Dependencies**:
