@@ -9,6 +9,7 @@ from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
 import re
 from scipy.ndimage import zoom
+import supervision as sv
 
 # ==========================================
 # CONFIGURATION
@@ -70,7 +71,6 @@ def run_inference(model, processor, image_path, query):
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         generated_tokens = [processor.tokenizer.decode([tid], skip_special_tokens=False) for tid in generated_ids[0]]
     
-    # ... (indexing logic remains the same)
     input_ids = inputs.input_ids[0].cpu().tolist()
     vision_start_id = processor.tokenizer.convert_tokens_to_ids("<|vision_start|>")
     vision_end_id = processor.tokenizer.convert_tokens_to_ids("<|vision_end|>")
@@ -135,10 +135,7 @@ def run_inference(model, processor, image_path, query):
     
     return output_text, image, think_hm, answer_hm
 
-import supervision as sv
-
 def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, teacher_box=None):
-    print(f"DEBUG: visualize_result called with teacher_box={'set' if teacher_box is not None else 'None'}")
     print(f"\nModel Output:\n{output_text}")
     
     # 1. Extraction (Coordinates and Query)
@@ -185,14 +182,14 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, t
     # 3. Visualization Layout
     fig, axes = plt.subplots(1, 4, figsize=(32, 8))
     
-    # Panel 1: VLM Precision Boxes
+    # Panel 1: VLM Prediction
     axes[0].imshow(annotated_frame)
-    axes[0].set_title(f"VLM Prediction: '{extracted_query}'", fontsize=14)
+    axes[0].set_title(f"VLM: '{extracted_query}'", fontsize=14)
     axes[0].axis("off")
 
     # Panel 2 & 3: Attention Maps
-    for idx, (hm, title, cmap) in enumerate([(think_heatmap, "Panel 2: <think> Attention", "jet"), 
-                                            (answer_heatmap, "Panel 3: <answer> Attention", "hot")]):
+    for idx, (hm, title, cmap) in enumerate([(think_heatmap, "<think> Attention", "jet"), 
+                                            (answer_heatmap, "<answer> Attention", "hot")]):
         ax = axes[idx+1]
         if hm is not None:
             zh, zw = h / hm.shape[0], w / hm.shape[1]
@@ -207,13 +204,8 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, t
     # Panel 4: Teacher Oracle (Grounding DINO)
     ax_teacher = axes[3]
     if teacher_box is not None:
-        import supervision as sv
         t_detections = sv.Detections(xyxy=np.array([teacher_box]))
-        # Use INDEX lookup to avoid class_id requirement, and specify a single color
         t_annotator = sv.BoxAnnotator(color_lookup=sv.ColorLookup.INDEX)
-        # Note: older supervision used 'color', newer uses 'color_lookup'. 
-        # To force a specific color, we can pass it to annotate or use a palette.
-        # But for simplicity and compatibility with the error message:
         t_label_annotator = sv.LabelAnnotator(color_lookup=sv.ColorLookup.INDEX)
         
         t_frame = np.array(image)
@@ -223,7 +215,7 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, t
         ax_teacher.imshow(t_frame)
     else:
         ax_teacher.imshow(image)
-        ax_teacher.text(0.5, 0.5, "DINO Failed", color='red', ha='center', va='center', fontsize=20)
+        ax_teacher.text(0.5, 0.5, "DINO Idle", color='gray', ha='center', va='center', fontsize=20)
     ax_teacher.set_title(f"Teacher Oracle (DINO)", fontsize=14)
     ax_teacher.axis("off")
 
@@ -248,7 +240,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Multi-purpose Visual Grounding Diagnostic with DINO Teacher")
     parser.add_argument("image", help="Path to input image")
-    parser.add_argument("query", help="Text query (e.g., 'Find the box on the table')")
+    parser.add_argument("query", help="Text query")
     parser.add_argument("--teacher", action="store_true", help="Enable Grounding DINO Teacher Oracle")
     args = parser.parse_args()
 
@@ -259,13 +251,10 @@ if __name__ == "__main__":
     model, processor = load_model()
     out_text, img, t_hm, a_hm = run_inference(model, processor, args.image, args.query)
     
-    # Extract Teacher Ground Truth if enabled
     t_box = None
     if args.teacher:
-        # Extract <query> tag from VLM response
         query_tag_match = re.search(r"<query>(.*?)</query>", out_text, re.DOTALL)
         oracle_query = query_tag_match.group(1).strip() if query_tag_match else args.query
-        
         oracle = TeacherOracle()
         t_box = oracle.get_ground_truth(img, oracle_query)
         
