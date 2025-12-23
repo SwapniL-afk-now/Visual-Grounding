@@ -16,10 +16,11 @@ class TeacherOracle:
         # Load in float32 to avoid bias/input type mismatch errors
         self.dino_model = AutoModelForZeroShotObjectDetection.from_pretrained(dino_id).to(self.device).float()
 
-    def get_ground_truth(self, image, text_query, box_threshold=0.3, text_threshold=0.25):
+    def get_ground_truth(self, image, text_query, box_threshold=0.2, text_threshold=0.2):
         """
         Takes an image and a text query, returns Grounding DINO's predicted BBox.
         """
+        print(f"Teacher Oracle: Processing query '{text_query}'...")
         # Ensure inputs are in float32 to match model weights
         inputs = self.dino_processor(images=image, text=text_query, return_tensors="pt").to(self.device)
         inputs = {k: v.float() if torch.is_floating_point(v) else v for k, v in inputs.items()}
@@ -36,8 +37,10 @@ class TeacherOracle:
         )[0]
 
         if len(results["boxes"]) == 0:
+            print(f"Teacher Oracle: No objects found for '{text_query}' (threshold={box_threshold})")
             return None
 
+        print(f"Teacher Oracle: Found {len(results['boxes'])} candidates. Max score: {results['scores'].max().item():.4f}")
         # Take the most confident box
         best_idx = results["scores"].argmax()
         dino_box = results["boxes"][best_idx].cpu().numpy() # [x1, y1, x2, y2]

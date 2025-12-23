@@ -135,7 +135,7 @@ def run_inference(model, processor, image_path, query):
     
     return output_text, image, think_hm, answer_hm
 
-def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, teacher_box=None):
+def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, teacher_box=None, teacher_on=False):
     print(f"\nModel Output:\n{output_text}")
     
     # 1. Extraction (Coordinates and Query)
@@ -211,12 +211,20 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query, t
         t_frame = np.array(image)
         t_frame = t_annotator.annotate(scene=t_frame, detections=t_detections)
         t_frame = t_label_annotator.annotate(scene=t_frame, detections=t_detections, labels=["DINO TRUTH"])
-        
+
+    # Better logic for Panel 4
+    ax_teacher.clear() # Clear previous
+    if teacher_box is not None:
         ax_teacher.imshow(t_frame)
+        ax_teacher.set_title(f"Teacher: SUCCESS", color='green', fontsize=14)
     else:
         ax_teacher.imshow(image)
-        ax_teacher.text(0.5, 0.5, "DINO Idle", color='gray', ha='center', va='center', fontsize=20)
-    ax_teacher.set_title(f"Teacher Oracle (DINO)", fontsize=14)
+        # We'll use the title to show status
+        status_msg = "Teacher: NO DETECTION" if teacher_on else "Teacher: DISABLED"
+        status_color = 'red' if teacher_on else 'gray'
+        ax_teacher.text(0.5, 0.5, status_msg, color=status_color, ha='center', va='center', fontsize=20, backgroundcolor='white')
+        ax_teacher.set_title(f"Teacher: {status_msg}", color=status_color, fontsize=14)
+    
     ax_teacher.axis("off")
 
     plt.tight_layout()
@@ -258,4 +266,4 @@ if __name__ == "__main__":
         oracle = TeacherOracle()
         t_box = oracle.get_ground_truth(img, oracle_query)
         
-    visualize_result(out_text, img, t_hm, a_hm, args.query, teacher_box=t_box)
+    visualize_result(out_text, img, t_hm, a_hm, args.query, teacher_box=t_box, teacher_on=args.teacher)
