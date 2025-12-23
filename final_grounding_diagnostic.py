@@ -42,12 +42,13 @@ def load_model():
 def run_inference(model, processor, image_path, query):
     print(f"Processing: {image_path} with query: '{query}'")
     image = Image.open(image_path)
+    width, height = image.size
     
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": [
             {"type": "image", "image": image_path},
-            {"type": "text", "text": f"{query} Provide coordinates in [xmin, ymin, xmax, ymax] format inside <answer> tags."}
+            {"type": "text", "text": f"The image has a resolution of {width}x{height}. {query} Provide coordinates in [xmin, ymin, xmax, ymax] format inside <answer> tags."}
         ]}
     ]
     
