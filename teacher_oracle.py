@@ -13,8 +13,8 @@ class TeacherOracle:
         
         # Grounding DINO for text-to-box
         self.dino_processor = AutoProcessor.from_pretrained(dino_id)
-        # Load in float32 to avoid bias/input type mismatch errors (float32 is safer for general use)
-        self.dino_model = AutoModelForZeroShotObjectDetection.from_pretrained(dino_id).to(self.device)
+        # Load in float32 to avoid bias/input type mismatch errors
+        self.dino_model = AutoModelForZeroShotObjectDetection.from_pretrained(dino_id).to(self.device).float()
 
     def get_ground_truth(self, image, text_query, box_threshold=0.3, text_threshold=0.25):
         """
@@ -22,6 +22,7 @@ class TeacherOracle:
         """
         # Ensure inputs are in float32 to match model weights
         inputs = self.dino_processor(images=image, text=text_query, return_tensors="pt").to(self.device)
+        inputs = {k: v.float() if torch.is_floating_point(v) else v for k, v in inputs.items()}
         
         with torch.no_grad():
             outputs = self.dino_model(**inputs)
