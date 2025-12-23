@@ -202,6 +202,7 @@ def visualize_result(output_text, image, think_heatmap, answer_heatmap, query):
     plt.tight_layout()
     plt.savefig("grounding_diagnostic.png", dpi=150)
     print("Result saved to grounding_diagnostic.png")
+    plt.show() # Display the image in interactive environments
 
 if __name__ == "__main__":
     import argparse
